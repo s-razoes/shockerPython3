@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-shocker.py v1.1
+shocker.py v1.1.1
 A tool to find and exploit webservers vulnerable to Shellshock
 
 ##############################################################################
@@ -381,7 +381,7 @@ def main():
   (   )|            |            
    `-. |--. .-.  .-.|.-. .-. .--.
   (   )|  |(   )(   |-.'(.-' |   
-   `-' '  `-`-'  `-''  `-`--''  v1.1 
+   `-' '  `-`-'  `-''  `-`--''  v1.1.1 
    
  Tom Watson, tom.watson@nccgroup.trust
  https://www.github.com/nccgroup/shocker
@@ -519,6 +519,6 @@ def main():
     else:
         print("[+] No targets found to exploit")
 
-__version__ = '1.1'
+__version__ = '1.1.1'
 if __name__ == '__main__':
     main()
