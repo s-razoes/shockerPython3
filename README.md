@@ -59,10 +59,14 @@ Scans all hosts listed in the file ./hostlist with the default options
 
 Dependencies 
 -------------
-Python 2.7+
+Python 3+
 
 Change Log
 -------------
+Changes in version 1.1.1 (December 2021) 
+
+* Changed code to be compatible with Python3 - s-razoes
+
 Changes in version 1.1 (June 2018)
 
 * Added some additinoal debugging  functionality and corrected help text
